@@ -5,6 +5,8 @@ import seaborn as sns
 import io
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 
+st.set_page_config(page_title="Implementing Data Quality Analysis", layout="wide")
+
 # Streamlit app title
 st.title('Dataset Visualization and Analysis Tool')
 
@@ -14,14 +16,26 @@ st.sidebar.title('Options')
 # File upload in the sidebar
 uploaded_file = st.sidebar.file_uploader("Upload your dataset (CSV file)", type=['csv'])
 
+# Function to remove outliers using IQR method
 def remove_outliers_iqr(data, column):
     """Remove outliers using the IQR method."""
+    if not pd.api.types.is_numeric_dtype(data[column]):
+        st.error(f"The selected column '{column}' is not numeric.")
+        return data  # Return the original data without changes
+
     Q1 = data[column].quantile(0.25)
     Q3 = data[column].quantile(0.75)
     IQR = Q3 - Q1
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
+
+    # Debugging outputs
+    st.write(f"Q1: {Q1}, Q3: {Q3}, IQR: {IQR}, Lower Bound: {lower_bound}, Upper Bound: {upper_bound}")
+
+    # Filter data to remove outliers
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    st.write(f"Original Shape: {data.shape}, New Shape: {filtered_data.shape}")  # Check shapes
+
     return filtered_data
 
 # Initialize session state for DataFrame
@@ -168,12 +182,19 @@ if uploaded_file:
     if remove_outliers:
         columns = st.session_state.df.columns.tolist()
         column_to_check = st.sidebar.selectbox('Select Column for Outlier Removal', columns)
+    else:
+        column_to_check = None
+        
+    if column_to_check:
+        new_df = remove_outliers_iqr(st.session_state.df, column_to_check)
+        st.session_state.df = new_df  # Update the session state with the new DataFrame
 
-        # Perform outlier removal if a column is selected
-        if column_to_check:
-            new_df = remove_outliers_iqr(st.session_state.df, column_to_check)
-            st.session_state.df = new_df  # Update the session state with the new DataFrame
-            st.write(f"Outliers removed based on {column_to_check}. New shape: {st.session_state.df.shape}")
+        # Confirm outlier removal
+        st.write(f"Outliers removed based on {column_to_check}. New shape: {st.session_state.df.shape}")
+
+        # Optionally display the new DataFrame for verification
+        st.write("Updated Dataset Preview:")
+        st.write(st.session_state.df.head())  # Display the first few rows of the updated DataFrame
 
     # Handle missing values
     if drop_missing:
